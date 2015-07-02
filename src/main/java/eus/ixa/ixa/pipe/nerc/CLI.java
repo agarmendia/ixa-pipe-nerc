@@ -213,27 +213,32 @@ public class CLI {
       lang = kaf.getLang();
     }
     Properties properties = setAnnotateProperties(model, lang, lexer, dictTag, dictPath, clearFeatures);
-    KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
-        "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
-    newLp.setBeginTimestamp();
-    Annotate annotator = new Annotate(properties);
-    annotator.annotateNEs(kaf);
-    newLp.setEndTimestamp();
-    String kafToString = null;
-    if (outputFormat.equalsIgnoreCase("conll03")) {
-      kafToString = annotator.annotateNEsToCoNLL2003(kaf);
-    } else if (outputFormat.equalsIgnoreCase("conll02")) {
-      kafToString = annotator.annotateNEsToCoNLL2002(kaf);
-    } else if (outputFormat.equalsIgnoreCase("opennlp")) {
-      kafToString = annotator.annotateNEsToOpenNLP(kaf);
-    } else {
-      kafToString = annotator.annotateNEsToKAF(kaf);
-    }
+    String kafToString = annotateKafDoc(kaf, properties, outputFormat);
     bwriter.write(kafToString);
     bwriter.close();
     breader.close();
   }
-  
+
+	private String annotateKafDoc(KAFDocument kaf, Properties properties, String outputFormat) {
+     KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
+        "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
+     newLp.setBeginTimestamp();
+     Annotate annotator = new Annotate(properties);
+     annotator.annotateNEs(kaf);
+     newLp.setEndTimestamp();
+     String kafToString = null;
+     if (outputFormat.equalsIgnoreCase("conll03")) {
+       kafToString = annotator.annotateNEsToCoNLL2003(kaf);
+     } else if (outputFormat.equalsIgnoreCase("conll02")) {
+       kafToString = annotator.annotateNEsToCoNLL2002(kaf);
+     } else if (outputFormat.equalsIgnoreCase("opennlp")) {
+       kafToString = annotator.annotateNEsToOpenNLP(kaf);
+     } else {
+       kafToString = annotator.annotateNEsToKAF(kaf);
+    }
+	 return kafToString;
+    }
+
   /**
    * Main method to do Opinion Target Extraction (OTE).
    * 
