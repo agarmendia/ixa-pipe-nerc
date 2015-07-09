@@ -29,7 +29,7 @@ import java.io.OutputStreamWriter;
 import java.util.Properties;
 
 import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.Arguments;
+import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -194,7 +194,7 @@ public class CLI {
     BufferedWriter bwriter = new BufferedWriter(new OutputStreamWriter(
         outputStream, "UTF-8"));
     // read KAF document from inputstream
-    KAFDocument kaf = KAFDocument.createFromStream(breader);
+    //KAFDocument kaf = KAFDocument.createFromStream(breader);
     // load parameters into a properties
     String model = parsedArguments.getString("model");
     String outputFormat = parsedArguments.getString("outputFormat");
@@ -202,6 +202,7 @@ public class CLI {
     String dictTag = parsedArguments.getString("dictTag");
     String dictPath = parsedArguments.getString("dictPath");
     String clearFeatures = parsedArguments.getString("clearFeatures");
+    Boolean serverMode = parsedArguments.getBoolean("server");
     // language parameter
     String lang = null;
     if (parsedArguments.getString("language") != null) {
@@ -237,6 +238,7 @@ public class CLI {
   }
 
 	private String annotateKafDoc(Annotate annotator, String model, String outputFormat, BufferedReader breader) throws IOException {
+     KAFDocument kaf = KAFDocReader.readKaf(breader);
      KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
         "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
      newLp.setBeginTimestamp();
