@@ -29,6 +29,7 @@ import java.io.OutputStreamWriter;
 import java.util.Properties;
 
 import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -137,6 +138,7 @@ public class CLI {
   public static void main(final String[] args) throws IOException,
       JDOMException {
 
+    System.err.println("[IXAdaemon]INIT");
     CLI cmdLine = new CLI();
     cmdLine.parseCLI(args);
   }
@@ -204,26 +206,40 @@ public class CLI {
     String lang = null;
     if (parsedArguments.getString("language") != null) {
       lang = parsedArguments.getString("language");
-      if (!kaf.getLang().equalsIgnoreCase(lang)) {
+      /*if (!kaf.getLang().equalsIgnoreCase(lang)) {
         System.err
             .println("Language parameter in NAF and CLI do not match!!");
         System.exit(1);
       }
     } else {
-      lang = kaf.getLang();
+      lang = kaf.getLang();*/
     }
     Properties properties = setAnnotateProperties(model, lang, lexer, dictTag, dictPath, clearFeatures);
-    String kafToString = annotateKafDoc(kaf, properties, outputFormat);
-    bwriter.write(kafToString);
+    Annotate annotator = new Annotate(properties);
+    System.err.println("[IXAdaemon]RUN");
+    if (serverMode) {
+      while (true) {
+        String kafToString = annotateKafDoc(annotator, model, outputFormat, breader);
+        bwriter.write(kafToString);
+        bwriter.write("[IXAdaemon]EOD");
+        bwriter.write("\n");
+        bwriter.flush();
+      }
+    } else {
+      String kafToString = annotateKafDoc(annotator, model, outputFormat, breader);
+      bwriter.write(kafToString);
+      bwriter.write("[IXAdaemon]EOD");
+      bwriter.write("\n");
+      bwriter.flush();
+    }
     bwriter.close();
     breader.close();
   }
 
-	private String annotateKafDoc(KAFDocument kaf, Properties properties, String outputFormat) {
+	private String annotateKafDoc(Annotate annotator, String model, String outputFormat, BufferedReader breader) throws IOException {
      KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
         "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
      newLp.setBeginTimestamp();
-     Annotate annotator = new Annotate(properties);
      annotator.annotateNEs(kaf);
      newLp.setEndTimestamp();
      String kafToString = null;
@@ -405,6 +421,10 @@ public class CLI {
         .setDefault(Flags.DEFAULT_DICT_PATH)
         .help("Provide the path to the dictionaries for direct dictionary tagging; it ONLY WORKS if --dictTag " +
         		"option is activated.\n");
+    annotateParser.addArgument("-server", "--server")
+        .required(false)
+        .action(Arguments.storeTrue())
+        .help("Choose if you want to run nerc as a server");
   }
   
   /**
