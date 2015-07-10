@@ -193,8 +193,6 @@ public class CLI {
         inputStream, "UTF-8"));
     BufferedWriter bwriter = new BufferedWriter(new OutputStreamWriter(
         outputStream, "UTF-8"));
-    // read KAF document from inputstream
-    //KAFDocument kaf = KAFDocument.createFromStream(breader);
     // load parameters into a properties
     String model = parsedArguments.getString("model");
     String outputFormat = parsedArguments.getString("outputFormat");
@@ -207,55 +205,75 @@ public class CLI {
     String lang = null;
     if (parsedArguments.getString("language") != null) {
       lang = parsedArguments.getString("language");
-      /*if (!kaf.getLang().equalsIgnoreCase(lang)) {
-        System.err
-            .println("Language parameter in NAF and CLI do not match!!");
-        System.exit(1);
-      }
-    } else {
-      lang = kaf.getLang();*/
     }
-    Properties properties = setAnnotateProperties(model, lang, lexer, dictTag, dictPath, clearFeatures);
-    Annotate annotator = new Annotate(properties);
-    System.err.println("[IXAdaemon]RUN");
-    if (serverMode) {
-      while (true) {
-        String kafToString = annotateKafDoc(annotator, model, outputFormat, breader);
-        bwriter.write(kafToString);
-        bwriter.write("[IXAdaemon]EOD");
-        bwriter.write("\n");
-        bwriter.flush();
-      }
+    Properties properties = setAnnotateProperties(model, lexer, dictTag, dictPath, clearFeatures);
+    if (serverMode){
+      annotateKafDoc_server(properties, model, outputFormat, lang, breader, bwriter);
     } else {
-      String kafToString = annotateKafDoc(annotator, model, outputFormat, breader);
-      bwriter.write(kafToString);
-      bwriter.write("[IXAdaemon]EOD");
-      bwriter.write("\n");
-      bwriter.flush();
+      annotateKafDoc_noServer(properties, model, outputFormat, lang, breader, bwriter);
     }
     bwriter.close();
     breader.close();
   }
 
-	private String annotateKafDoc(Annotate annotator, String model, String outputFormat, BufferedReader breader) throws IOException {
-     KAFDocument kaf = KAFDocReader.readKaf(breader);
-     KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
-        "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
-     newLp.setBeginTimestamp();
-     annotator.annotateNEs(kaf);
-     newLp.setEndTimestamp();
-     String kafToString = null;
-     if (outputFormat.equalsIgnoreCase("conll03")) {
-       kafToString = annotator.annotateNEsToCoNLL2003(kaf);
-     } else if (outputFormat.equalsIgnoreCase("conll02")) {
-       kafToString = annotator.annotateNEsToCoNLL2002(kaf);
-     } else if (outputFormat.equalsIgnoreCase("opennlp")) {
-       kafToString = annotator.annotateNEsToOpenNLP(kaf);
-     } else {
-       kafToString = annotator.annotateNEsToKAF(kaf);
+	private void annotateKafDoc_server(Properties properties, String model, String outputFormat, String lang, BufferedReader breader, BufferedWriter bwriter) throws IOException {
+    properties = addLangProperty(properties,lang);
+    Annotate annotator = new Annotate(properties);
+    System.err.println("[IXAdaemon]RUN");
+    while (true){
+      KAFDocument kaf = KAFDocReader.readKaf(breader);
+
+      KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
+          "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
+      newLp.setBeginTimestamp();
+      annotator.annotateNEs(kaf);
+      newLp.setEndTimestamp();
+      String kafToString = null;
+      if (outputFormat.equalsIgnoreCase("conll03")) {
+        kafToString = annotator.annotateNEsToCoNLL2003(kaf);
+      } else if (outputFormat.equalsIgnoreCase("conll02")) {
+        kafToString = annotator.annotateNEsToCoNLL2002(kaf);
+      } else if (outputFormat.equalsIgnoreCase("opennlp")) {
+        kafToString = annotator.annotateNEsToOpenNLP(kaf);
+      } else {
+        kafToString = annotator.annotateNEsToKAF(kaf);
+      }
+      bwriter.write(kafToString);
+      bwriter.write("[IXAdaemon]EOD");
+      bwriter.write("\n");
+      bwriter.flush();
     }
-	 return kafToString;
+  }
+
+  private void annotateKafDoc_noServer(Properties properties, String model, String outputFormat, String lang, BufferedReader breader, BufferedWriter bwriter) throws IOException, JDOMException {
+    // read KAF document from inputstream
+    KAFDocument kaf = KAFDocument.createFromStream(breader);
+    if (!kaf.getLang().equalsIgnoreCase(lang)) {
+        System.err.println("Language parameter in NAF and CLI do not match!!");
+        System.exit(1);
+    } else {
+      lang = kaf.getLang();
     }
+
+    properties = addLangProperty(properties, lang);
+    KAFDocument.LinguisticProcessor newLp = kaf.addLinguisticProcessor(
+       "entities", "ixa-pipe-nerc-" + Files.getNameWithoutExtension(model), version + "-" + commit);
+    newLp.setBeginTimestamp();
+    Annotate annotator = new Annotate(properties);
+    annotator.annotateNEs(kaf);
+    newLp.setEndTimestamp();
+    String kafToString = null;
+    if (outputFormat.equalsIgnoreCase("conll03")) {
+      kafToString = annotator.annotateNEsToCoNLL2003(kaf);
+    } else if (outputFormat.equalsIgnoreCase("conll02")) {
+      kafToString = annotator.annotateNEsToCoNLL2002(kaf);
+    } else if (outputFormat.equalsIgnoreCase("opennlp")) {
+      kafToString = annotator.annotateNEsToOpenNLP(kaf);
+    } else {
+      kafToString = annotator.annotateNEsToKAF(kaf);
+    }
+    bwriter.write(kafToString);
+  }
 
   /**
    * Main method to do Opinion Target Extraction (OTE).
@@ -516,14 +534,18 @@ public class CLI {
    * @param dictPath directory to the dictionaries
    * @return the properties object
    */
-  private Properties setAnnotateProperties(String model, String language, String lexer, String dictTag, String dictPath, String clearFeatures) {
+  private Properties setAnnotateProperties(String model, String lexer, String dictTag, String dictPath, String clearFeatures) {
     Properties annotateProperties = new Properties();
     annotateProperties.setProperty("model", model);
-    annotateProperties.setProperty("language", language);
     annotateProperties.setProperty("ruleBasedOption", lexer);
     annotateProperties.setProperty("dictTag", dictTag);
     annotateProperties.setProperty("dictPath", dictPath);
     annotateProperties.setProperty("clearFeatures", clearFeatures);
+    return annotateProperties;
+  }
+
+  private Properties addLangProperty(Properties annotateProperties, String language){
+    annotateProperties.setProperty("language", language);
     return annotateProperties;
   }
   
